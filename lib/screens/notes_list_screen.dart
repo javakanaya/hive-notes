@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_notes/config/app_theme.dart';
 import 'package:hive_notes/models/note_model.dart';
 import 'package:hive_notes/screens/note_edit_screen.dart';
 import 'package:hive_notes/services/notes_service.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 class NotesListScreen extends StatefulWidget {
@@ -40,15 +42,57 @@ class _NotesListScreenState extends State<NotesListScreen> {
   }
 
   void _deleteNote(String id) async {
-    await _notesService.deleteNote(id);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Note deleted'), duration: Duration(seconds: 2)),
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Delete Note'),
+            content: const Text('Are you sure you want to delete this note?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
     );
+
+    if (confirmed == true) {
+      await _notesService.deleteNote(id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Note deleted'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   String _formatDate(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final noteDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+    if (noteDate == today) {
+      return 'Today, ${DateFormat.jm().format(dateTime)}';
+    } else if (noteDate == yesterday) {
+      return 'Yesterday, ${DateFormat.jm().format(dateTime)}';
+    } else {
+      return DateFormat.yMMMd().format(dateTime);
+    }
+  }
+
+  // Get a color for the note
+  Color _getNoteColor(String id) {
+    final index = id.hashCode % AppTheme.noteColors.length;
+    return AppTheme.noteColors[index];
   }
 
   @override
@@ -70,85 +114,99 @@ class _NotesListScreenState extends State<NotesListScreen> {
 
           if (notes.isEmpty) {
             return Center(
-              child: Text(
-                'No notes yet. Tap + to add one.',
-                style: TextStyle(color: Colors.grey[600], fontSize: 16),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.note_add,
+                    size: 64,
+                    color: Theme.of(context).colorScheme.primary.withAlpha(127),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No notes yet. Tap + to add one.',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                ],
               ),
             );
           }
-          return ListView.builder(
-            itemCount: notes.length,
-            itemBuilder: (context, index) {
-              final note = notes[index];
-              final displayDate =
-                  note.updatedAt != null
-                      ? 'Updated : ${_formatDate(note.updatedAt!)}'
-                      : 'Created : ${_formatDate(note.createdAt)}';
 
-              return Dismissible(
-                key: Key(note.id),
-                // swipes from left to right
-                background: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  alignment: Alignment.centerLeft,
-                  padding: const EdgeInsets.only(left: 20),
-                  child: const Icon(Icons.delete, color: Colors.white),
-                ),
-                // swipes from right to left
-                secondaryBackground: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  alignment: Alignment.centerRight,
-                  padding: const EdgeInsets.only(right: 20),
-                  child: const Icon(Icons.delete, color: Colors.white),
-                ),
-                confirmDismiss: (direction) async {
-                  return await showDialog(
-                    context: context,
-                    builder:
-                        (context) => AlertDialog(
-                          title: const Text('Delete Note'),
-                          content: const Text(
-                            'Are you sure you want to delete this note?',
+          // Show notes in a grid
+          return Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: GridView.builder(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 0.9,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+              ),
+              itemCount: notes.length,
+              itemBuilder: (context, index) {
+                final note = notes[index];
+                final displayDate =
+                    note.updatedAt != null
+                        ? _formatDate(note.updatedAt!)
+                        : _formatDate(note.createdAt);
+
+                return GestureDetector(
+                  onTap: () => _editNote(note),
+                  child: Card(
+                    color: _getNoteColor(note.id),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  note.title.isEmpty ? 'Untitled Note' : note.title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              InkWell(
+                                onTap: () => _deleteNote(note.id),
+                                child: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
                           ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(false),
-                              child: const Text('Cancel'),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Text(
+                              note.content,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.black.withAlpha(179),
+                              ),
+                              maxLines: 5,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            TextButton(
-                              onPressed: () => Navigator.of(context).pop(true),
-                              child: const Text('Delete'),
-                            ),
-                          ],
-                        ),
-                  );
-                },
-                onDismissed: (direction) => _deleteNote(note.id),
-                child: Card(
-                  child: ListTile(
-                    title: Text(note.title.isEmpty ? 'Untitled Note' : note.title),
-                    subtitle: Column(
-                      children: [
-                        if (note.content.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(note.content),
-                          const SizedBox(height: 6),
-                          Text(displayDate),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            displayDate,
+                            style: TextStyle(fontSize: 12, color: Colors.black54),
+                          ),
                         ],
-                      ],
+                      ),
                     ),
-                    onTap: () => _editNote(note),
-                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           );
         },
       ),

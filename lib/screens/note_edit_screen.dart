@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hive_notes/config/app_theme.dart';
 import 'package:hive_notes/models/note_model.dart';
 import 'package:hive_notes/services/notes_service.dart';
 
@@ -22,6 +23,7 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   // Store original values to check if they've become empty
   late final String _originalTitle;
   late final String _originalContent;
+  late Color _noteColor;
 
   void _onTextChange() {
     // Check if the title or content has changed
@@ -46,6 +48,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     _titleFocus = FocusNode();
     _contentFocus = FocusNode();
 
+    // Set note color based on id
+    _noteColor = _getNoteColor(widget.note.id);
+
     // Set focus to title if it's a new empty note
     if (widget.isNew && widget.note.title.isEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -56,6 +61,12 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     // Add listeners to the text fields
     _titleController.addListener(_onTextChange);
     _contentController.addListener(_onTextChange);
+  }
+
+  // Get color for note
+  Color _getNoteColor(String id) {
+    final index = id.hashCode % AppTheme.noteColors.length;
+    return AppTheme.noteColors[index];
   }
 
   Future<bool> _onWillPop() async {
@@ -137,7 +148,6 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           setState(() {
             _isModified = false; // Reset the modified state
           });
-          return;
         }
       }
     }
@@ -176,7 +186,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
+        backgroundColor: _noteColor,
         appBar: AppBar(
+          backgroundColor: _noteColor,
           title: Text(widget.isNew ? 'New Note' : 'Edit Note'),
           actions: [IconButton(icon: const Icon(Icons.save), onPressed: _saveNote)],
         ),
@@ -184,12 +196,14 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
+              // Title Field
               TextField(
                 controller: _titleController,
                 focusNode: _titleFocus,
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 decoration: const InputDecoration(
                   labelText: 'Title',
+                  filled: false,
                   border: InputBorder.none,
                 ),
                 maxLines: 1,
@@ -198,20 +212,27 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
                   _contentFocus.requestFocus();
                 },
               ),
-              const Divider(),
+
+              const Divider(height: 20),
+
               Expanded(
                 child: TextField(
                   controller: _contentController,
                   focusNode: _contentFocus,
                   style: const TextStyle(fontSize: 16),
                   decoration: const InputDecoration(
-                    labelText: 'Content',
+                    hintText: 'Note Content',
+                    filled: false,
                     border: InputBorder.none,
+                    // Add this to align hint text to the top
+                    alignLabelWithHint: true,
                   ),
                   maxLines: null,
                   expands: true,
                   textCapitalization: TextCapitalization.sentences,
                   keyboardType: TextInputType.multiline,
+                  // Add this to align text to the top
+                  textAlignVertical: TextAlignVertical.top,
                 ),
               ),
             ],
