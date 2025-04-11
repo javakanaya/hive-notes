@@ -15,25 +15,6 @@ class NotesListScreen extends StatefulWidget {
 class _NotesListScreenState extends State<NotesListScreen> {
   final NotesService _notesService = NotesService();
   final _uuid = Uuid();
-  List<Note> _notes = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _refreshNotes();
-  }
-
-  void _refreshNotes() {
-    setState(() {
-      _notes = _notesService.getAllNotes();
-      // sort notes by updatedAt or createdAt
-      _notes.sort((a, b) {
-        final aDate = a.updatedAt ?? a.createdAt;
-        final bDate = b.updatedAt ?? b.createdAt;
-        return bDate.compareTo(aDate); // newest first
-      });
-    });
-  }
 
   void _createNewNote() async {
     final newNote = Note(
@@ -44,56 +25,26 @@ class _NotesListScreenState extends State<NotesListScreen> {
     );
 
     //  Navigate to the note editor screen
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => NoteEditScreen(note: newNote, isNew: true)),
     );
-
-    if (result == true) {
-      _refreshNotes();
-    }
   }
 
   void _editNote(Note note) async {
     // Navigate to the note editor screen
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => NoteEditScreen(note: note, isNew: false)),
     );
-
-    if (result == true) {
-      _refreshNotes();
-    }
   }
 
   void _deleteNote(String id) async {
-    final confirmed = await showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Delete Note'),
-            content: const Text('Are you sure you want to delete this note?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
+    await _notesService.deleteNote(id);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Note deleted'), duration: Duration(seconds: 2)),
     );
-
-    if (confirmed == true) {
-      await _notesService.deleteNote(id);
-      _refreshNotes();
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Note deleted'), duration: Duration(seconds: 2)),
-      );
-    }
   }
 
   String _formatDate(DateTime dateTime) {
@@ -107,7 +58,17 @@ class _NotesListScreenState extends State<NotesListScreen> {
       body: ValueListenableBuilder(
         valueListenable: Hive.box<Note>('notesBox').listenable(),
         builder: (context, Box<Note> box, _) {
-          if (_notes.isEmpty) {
+          // Get all notes directly from the box
+          final notes = box.values.toList();
+
+          // Sort notes in the builder
+          notes.sort((a, b) {
+            final aDate = a.updatedAt ?? a.createdAt;
+            final bDate = b.updatedAt ?? b.createdAt;
+            return bDate.compareTo(aDate); // newest first
+          });
+
+          if (notes.isEmpty) {
             return Center(
               child: Text(
                 'No notes yet. Tap + to add one.',
@@ -116,13 +77,14 @@ class _NotesListScreenState extends State<NotesListScreen> {
             );
           }
           return ListView.builder(
-            itemCount: _notes.length,
+            itemCount: notes.length,
             itemBuilder: (context, index) {
-              final note = _notes[index];
+              final note = notes[index];
               final displayDate =
                   note.updatedAt != null
                       ? 'Updated : ${_formatDate(note.updatedAt!)}'
                       : 'Created : ${_formatDate(note.createdAt)}';
+
               return Dismissible(
                 key: Key(note.id),
                 // swipes from left to right
