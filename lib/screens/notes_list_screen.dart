@@ -96,6 +96,10 @@ class _NotesListScreenState extends State<NotesListScreen> {
     }
   }
 
+  String _formatDate(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,7 +119,73 @@ class _NotesListScreenState extends State<NotesListScreen> {
             itemCount: _notes.length,
             itemBuilder: (context, index) {
               final note = _notes[index];
-              return Text(note.title);
+              final displayDate =
+                  note.updatedAt != null
+                      ? 'Updated : ${_formatDate(note.updatedAt!)}'
+                      : 'Created : ${_formatDate(note.createdAt)}';
+              return Dismissible(
+                key: Key(note.id),
+                // swipes from left to right
+                background: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                // swipes from right to left
+                secondaryBackground: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: const Icon(Icons.delete, color: Colors.white),
+                ),
+                confirmDismiss: (direction) async {
+                  return await showDialog(
+                    context: context,
+                    builder:
+                        (context) => AlertDialog(
+                          title: const Text('Delete Note'),
+                          content: const Text(
+                            'Are you sure you want to delete this note?',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                  );
+                },
+                onDismissed: (direction) => _deleteNote(note.id),
+                child: Card(
+                  child: ListTile(
+                    title: Text(note.title.isEmpty ? 'Untitled Note' : note.title),
+                    subtitle: Column(
+                      children: [
+                        if (note.content.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(note.content),
+                          const SizedBox(height: 6),
+                          Text(displayDate),
+                        ],
+                      ],
+                    ),
+                    onTap: () => _editNote(note),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
+                  ),
+                ),
+              );
             },
           );
         },
