@@ -19,6 +19,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   late FocusNode _contentFocus;
   bool _isModified = false;
   final NotesService _notesService = NotesService();
+  // Store original values to check if they've become empty
+  late final String _originalTitle;
+  late final String _originalContent;
 
   void _onTextChange() {
     // Check if the title or content has changed
@@ -34,6 +37,9 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
   @override
   void initState() {
     super.initState();
+
+    _originalTitle = widget.note.title;
+    _originalContent = widget.note.content;
 
     _titleController = TextEditingController(text: widget.note.title);
     _contentController = TextEditingController(text: widget.note.content);
@@ -94,31 +100,45 @@ class _NoteEditScreenState extends State<NoteEditScreen> {
         return;
       }
 
-      final shouldDelete = await showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text('Delete Empty Note'),
-              content: const Text('Do you want to delete this empty note?'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false), // Don't allow pop
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true), // Allow pop
-                  child: const Text('Delete'),
-                ),
-              ],
-            ),
-      );
+      // If it's an existing note that wasn't empty before, ask about deletion
+      if (_originalTitle.isNotEmpty || _originalContent.isNotEmpty) {
+        final shouldDelete =
+            await showDialog<bool>(
+              context: context,
+              builder:
+                  (context) => AlertDialog(
+                    title: const Text('Delete Empty Note'),
+                    content: const Text('Do you want to delete this empty note?'),
+                    actions: [
+                      TextButton(
+                        onPressed:
+                            () => Navigator.of(context).pop(false), // Don't allow pop
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true), // Allow pop
+                        child: const Text('Delete'),
+                      ),
+                    ],
+                  ),
+            ) ??
+            false;
 
-      if (shouldDelete == true) {
-        await _notesService.deleteNote(widget.note.id);
-        if (mounted) {
-          Navigator.pop(context, true);
+        if (shouldDelete) {
+          await _notesService.deleteNote(widget.note.id);
+          if (mounted) {
+            Navigator.pop(context, true);
+          }
+          return;
+        } else {
+          // If the user chooses not to delete, just pop without saving
+          _titleController.text = _originalTitle;
+          _contentController.text = _originalContent;
+          setState(() {
+            _isModified = false; // Reset the modified state
+          });
+          return;
         }
-        return;
       }
     }
 
