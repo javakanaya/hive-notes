@@ -2,6 +2,10 @@
 
 A lightweight Flutter note-taking application built with Hive for local data storage.
 
+<img width="559" alt="image" src="https://github.com/user-attachments/assets/4394e7ff-9812-4db7-aade-2e4d3e559c41" />
+<img width="559" alt="image" src="https://github.com/user-attachments/assets/297641a6-68f5-4ef8-927a-6a5c9febabc8" />
+
+
 ## Features
 
 - Create, read, update, and delete notes
@@ -178,3 +182,7 @@ static ThemeData get theme => ThemeData(
 2. Run `flutter pub get` to install dependencies
 3. Run `flutter pub run build_runner build` to generate the Hive adapters
 4. Run `flutter run` to launch the app
+
+## Preview
+
+https://github.com/user-attachments/assets/e28bebf0-fba3-4520-9082-2b375b1d807d
